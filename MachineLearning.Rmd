@@ -1,0 +1,89 @@
+---
+title: "Prediction-Assignment-Writeup"
+author: "Miguel Ortiz"
+date: "25 de agosto de 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# LOAD DATA
+
+```{r}
+# Step 1. Load Libraries
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+
+# Step 2. Set the seed due reproducibility
+set.seed(1142)
+
+# Step 3. Load the train and test datasets
+train.raw <- read.csv(file.path(getwd(), "pml-training.csv"), na.strings=c("NA", "#DIV/0!", ""))
+test.raw <- read.csv(file.path(getwd(), "pml-testing.csv"), na.strings=c("NA", "#DIV/0!", ""))
+```
+
+# CLEANING DATA
+```{r}
+# Step 4. Let see the data with str in order to select the usefull information
+str(train.raw)
+
+# Step 5. Cleaning data
+# As we can see we can remove all the columns with NAs
+train.clean <- train.raw[, colSums(is.na(train.raw)) == 0]
+test.clean <- test.raw[, colSums(is.na(test.raw)) == 0]
+
+# Delete the first 7 variables. There are not usefull to predict [X, name, time1, time2, time, new_window, num_window]
+train.clean <- train.clean[, 8:length(colnames(train.clean))]
+test.clean <- test.clean[, 8:length(colnames(test.clean))]
+
+# Check for near zero variance predictors and delete it for the dataset
+nzv <- nearZeroVar(train.clean, saveMetrics = TRUE)
+train.clean <- train.clean[, nzv$nzv == FALSE]
+```
+
+# CREATE A VALIDATION DATASET
+```{r}
+# Step 6. Create a validation dataset from train data
+partition <- createDataPartition(train.clean$classe, p = 0.75, list = F)
+
+# Step 7. Generate the 3 final groups
+train.data <- train.clean[partition, ]
+validation.data <- train.clean[-partition, ]
+test.data <- test.clean
+
+dim(train.data)
+dim(validation.data)
+dim(test.data)
+```
+
+# MODELS GENERATION WITH TRAIN
+```{r}
+# Step 8. Random Forest
+model1 <- randomForest(classe ~ ., data = train.data, importance = TRUE, ntrees = 12)
+
+# Step 9. Decission Tree
+model2 <- rpart(classe ~ ., data = train.data)
+rpart.plot(model2, main = "Decision Tree")
+```
+
+# MODEL VALIDATION WITH VALIDATION
+```{r}
+# Model1
+pvalidation1 <- predict(model1, validation.data)
+print(confusionMatrix(pvalidation1, validation.data$classe))
+
+# Model2
+pvalidation2 <- predict(model2, validation.data, type = "class")
+print(confusionMatrix(pvalidation2, validation.data$classe))
+```
+
+# RESULTS OBTAINED USING MODEL 1
+```{r}
+# Model1 has the best results
+ptest1 <- predict(model1, test.data)
+ptest1
+```
